@@ -3,177 +3,212 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Meeting Scheduler with Alerts</title>
+  <title>Time Zone Meeting Scheduler</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
     body {
-      font-family: sans-serif;
-      padding: 20px;
+      font-family: 'Roboto', sans-serif;
+      background: #f5f5f5;
+      padding: 1rem;
       max-width: 600px;
       margin: auto;
     }
-    input, button {
-      padding: 10px;
-      margin: 5px 0;
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #0D47A1;
+    }
+    .card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    input[type="datetime-local"] {
       width: 100%;
-      font-size: 1rem;
+      padding: 0.75rem;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 0.75rem;
+      margin-right: 0.5rem;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #proposeBtn {
+      background-color: #1976D2;
+      color: white;
+    }
+    #acceptBtn {
+      background-color: #E3F2FD;
+      color: #1976D2;
+      border: 1px solid #1976D2;
     }
     .status {
-      padding: 10px;
-      border-radius: 5px;
-      margin-top: 10px;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 4px;
+      background: #eee;
     }
-    .accepted {
-      background: #d4edda;
-      color: #155724;
+    .share-box {
+      display: flex;
+      margin-top: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      overflow: hidden;
     }
-    .pending {
-      background: #fff3cd;
-      color: #856404;
+    .share-box input {
+      flex: 1;
+      padding: 0.5rem;
+      border: none;
     }
-    .empty {
-      background: #f8d7da;
-      color: #721c24;
+    .share-box button {
+      padding: 0 1rem;
+      border: none;
+      background: #1976D2;
+      color: white;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
+  <div class="card">
+    <h1><span class="material-icons">schedule</span> Meeting Scheduler</h1>
+    <div><strong>Your Time Zone:</strong> <span id="timezone"></span></div>
 
-<h2>Meeting Scheduler</h2>
-<p>Time zone: <span id="timezone"></span></p>
+    <label for="datetime">Propose Meeting Time:</label>
+    <input type="datetime-local" id="datetime" />
 
-<input type="datetime-local" id="datetime">
-<button id="proposeBtn">Propose Meeting</button>
-<button id="acceptBtn">Accept</button>
+    <div>
+      <button id="proposeBtn">Propose</button>
+      <button id="acceptBtn">Accept</button>
+    </div>
 
-<h3>Your Local View</h3>
-<div id="localView"></div>
-<div id="status" class="status empty">Waiting for proposal...</div>
+    <div class="status" id="status">No meeting proposed yet.</div>
+    <div id="localView"></div>
 
-<h3>Share this link</h3>
-<input id="shareInput" readonly>
-<button id="copyBtn">Copy Link</button>
+    <div class="share-box">
+      <input type="text" id="shareInput" readonly value="Loading...">
+      <button id="copyBtn">Copy</button>
+    </div>
+  </div>
 
-<!-- Libraries -->
-<script src="https://unpkg.com/yjs"></script>
-<script src="https://unpkg.com/y-webrtc"></script>
+  <!-- Load Yjs & y-webrtc from jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/yjs@13.6.9/dist/yjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/y-webrtc@10.5.2/dist/y-webrtc.min.js"></script>
 
-<script>
-  if (typeof Y === 'undefined') {
-    alert("❌ Yjs failed to load.");
-    throw new Error("Yjs not loaded");
-  }
-
-  if (typeof WebrtcProvider === 'undefined') {
-    alert("❌ y-webrtc failed to load.");
-    throw new Error("y-webrtc not loaded");
-  }
-
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  document.getElementById('timezone').textContent = timezone;
-
-  // Generate or get room ID
-  const urlParams = new URLSearchParams(window.location.search);
-  let room = urlParams.get('room');
-  if (!room) {
-    room = Math.random().toString(36).substring(2);
-    window.location.search = '?room=' + room;
-  } else {
-    alert("✅ Joined room: " + room);
-  }
-
-  const shareInput = document.getElementById('shareInput');
-  shareInput.value = window.location.href;
-
-  document.getElementById('copyBtn').onclick = () => {
-    shareInput.select();
-    document.execCommand('copy');
-    alert("📋 Link copied to clipboard!");
-  };
-
-  const ydoc = new Y.Doc();
-  const provider = new WebrtcProvider(room, ydoc);
-  const ymap = ydoc.getMap('meeting');
-
-  const datetimeInput = document.getElementById('datetime');
-  const localView = document.getElementById('localView');
-  const status = document.getElementById('status');
-
-  function formatTime(utcStr) {
-    try {
-      const date = new Date(utcStr);
-      return date.toLocaleString(undefined, {
-        timeZone: timezone,
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return 'Invalid time';
-    }
-  }
-
-  function updateDisplay() {
-    const time = ymap.get('time');
-    const accepted = ymap.get('acceptedBy') || [];
-
-    if (time) {
-      localView.textContent = formatTime(time);
-
-      if (accepted.includes(timezone)) {
-        status.className = 'status accepted';
-        status.textContent = "✅ You have accepted this meeting.";
-      } else {
-        status.className = 'status pending';
-        status.textContent = "⏳ Pending your acceptance.";
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof Y === 'undefined') {
+        alert("❌ Yjs failed to load.");
+        return;
       }
-    } else {
-      localView.textContent = "";
-      status.className = 'status empty';
-      status.textContent = "❗ No meeting proposed yet.";
-    }
-  }
+      if (typeof WebrtcProvider === 'undefined') {
+        alert("❌ y-webrtc failed to load.");
+        return;
+      }
+      alert("✅ Yjs and y-webrtc loaded successfully.");
+      
+      const localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      document.getElementById('timezone').textContent = localTZ;
 
-  document.getElementById('proposeBtn').onclick = () => {
-    const value = datetimeInput.value;
-    if (!value) {
-      alert("⚠️ Please select a valid date and time.");
-      return;
-    }
+      const ydoc = new Y.Doc();
+      let room = location.hash.slice(1);
+      if (!room) {
+        room = Math.random().toString(36).substring(2);
+        location.hash = room;
+      }
 
-    const localDate = new Date(value);
-    if (isNaN(localDate.getTime())) {
-      alert("⚠️ Invalid date/time.");
-      return;
-    }
+      const shareInput = document.getElementById('shareInput');
+      shareInput.value = window.location.href;
 
-    const isoString = localDate.toISOString();
-    ymap.set('time', isoString);
-    ymap.set('acceptedBy', []);
-    alert("📅 Meeting proposed successfully!");
-    datetimeInput.value = '';
-  };
+      document.getElementById('copyBtn').onclick = () => {
+        shareInput.select();
+        document.execCommand("copy");
+        alert("🔗 Link copied to clipboard!");
+      };
 
-  document.getElementById('acceptBtn').onclick = () => {
-    const time = ymap.get('time');
-    if (!time) {
-      alert("⚠️ No meeting has been proposed.");
-      return;
-    }
+      const provider = new WebrtcProvider(room, ydoc);
+      const ymap = ydoc.getMap('meeting');
 
-    const accepted = ymap.get('acceptedBy') || [];
-    if (!accepted.includes(timezone)) {
-      ymap.set('acceptedBy', [...accepted, timezone]);
-      alert("✅ You accepted the meeting.");
-    } else {
-      alert("ℹ️ You already accepted this meeting.");
-    }
-  };
+      provider.on('synced', () => {
+        alert("🔗 You have joined the meeting room!");
+      });
 
-  ymap.observe(updateDisplay);
-  updateDisplay();
-</script>
+      const datetimeInput = document.getElementById('datetime');
+      const proposeBtn = document.getElementById('proposeBtn');
+      const acceptBtn = document.getElementById('acceptBtn');
+      const status = document.getElementById('status');
+      const localView = document.getElementById('localView');
+
+      function formatTime(utcStr) {
+        try {
+          const date = new Date(utcStr);
+          return date.toLocaleString(undefined, {
+            timeZone: localTZ,
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', weekday: 'long'
+          });
+        } catch (e) {
+          return 'Invalid time';
+        }
+      }
+
+      function updateUI() {
+        const time = ymap.get('time');
+        const accepted = ymap.get('acceptedBy') || [];
+
+        if (time) {
+          localView.textContent = "Meeting Time in Your Time Zone: " + formatTime(time);
+          if (accepted.includes(localTZ)) {
+            status.textContent = "✅ You have accepted this meeting.";
+          } else {
+            status.textContent = "⏳ Meeting proposed. Awaiting your acceptance.";
+          }
+        } else {
+          localView.textContent = "";
+          status.textContent = "No meeting proposed yet.";
+        }
+      }
+
+      proposeBtn.onclick = () => {
+        const value = datetimeInput.value;
+        if (!value) {
+          alert("⚠️ Please select a valid date and time.");
+          return;
+        }
+        const isoTime = new Date(value).toISOString();
+        ymap.set('time', isoTime);
+        ymap.set('acceptedBy', []);
+        alert("✅ Meeting proposed successfully!");
+        datetimeInput.value = "";
+      };
+
+      acceptBtn.onclick = () => {
+        const time = ymap.get('time');
+        if (!time) {
+          alert("⚠️ No meeting proposed yet.");
+          return;
+        }
+        const accepted = ymap.get('acceptedBy') || [];
+        if (!accepted.includes(localTZ)) {
+          ymap.set('acceptedBy', [...accepted, localTZ]);
+          alert("✅ You have accepted the meeting.");
+        } else {
+          alert("ℹ️ You already accepted this meeting.");
+        }
+      };
+
+      ymap.observe(updateUI);
+      updateUI();
+    });
+  </script>
 </body>
 </html>
